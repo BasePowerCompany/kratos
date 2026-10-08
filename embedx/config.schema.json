@@ -598,10 +598,19 @@
         },
         "account_linking_mode": {
           "title": "Account linking mode",
-          "description": "Controls how account conflicts are resolved for this provider. `confirm_with_existing_credential` (default) requires the user to verify their identity with an existing credential. `automatic` silently links accounts if the provider verifies email ownership. This is only effective in the Ory Network.",
+          "description": "Controls how account conflicts are resolved for this provider. `confirm_with_existing_credential` (default) requires the user to verify their identity with an existing credential. `automatic` silently links accounts if the provider verifies ownership of an address at one of `account_linking_domains` that the existing identity has also verified.",
           "type": "string",
           "enum": ["confirm_with_existing_credential", "automatic"],
           "default": "confirm_with_existing_credential"
+        },
+        "account_linking_domains": {
+          "title": "Account linking domains",
+          "description": "Email domains this provider is authoritative for. With `automatic` account linking, only addresses at these domains are linked.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "examples": ["example.com"]
+          }
         }
       },
       "additionalProperties": false,

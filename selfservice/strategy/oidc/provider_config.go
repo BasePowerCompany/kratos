@@ -155,8 +155,13 @@ type Configuration struct {
 
 	// AccountLinkingMode controls how account conflicts are resolved for this provider.
 	// Possible values: "confirm_with_existing_credential" (default), "automatic".
-	// This is only effective in the Ory Network.
+	// "automatic" links only addresses at AccountLinkingDomains.
 	AccountLinkingMode string `json:"account_linking_mode,omitempty"`
+
+	// AccountLinkingDomains are the email domains this provider is authoritative
+	// for: with "automatic" linking, a login asserting a verified address at one
+	// of them signs in to the identity that already verified that address.
+	AccountLinkingDomains []string `json:"account_linking_domains,omitempty"`
 }
 
 func (p Configuration) Redir(public *url.URL) string {

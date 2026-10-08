@@ -283,6 +283,7 @@ func NewStrategy(d Dependencies, opts ...NewStrategyOpt) *Strategy {
 		credType:                    identity.CredentialsTypeOIDC,
 		handleUnknownProviderError:  func(err error) error { return err },
 		handleMethodNotAllowedError: func(err error) error { return err },
+		conflictingIdentityPolicy:   automaticAccountLinkingPolicy,
 	}
 
 	for _, opt := range opts {
