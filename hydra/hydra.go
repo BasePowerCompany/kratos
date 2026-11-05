@@ -32,6 +32,8 @@ type (
 		IdentityID            string
 		SessionID             string
 		AuthenticationMethods session.AuthenticationMethods
+		// DoNotRemember stops Hydra from remembering this login: Hydra stamps an unskipped login with the acceptance time, not the session's authenticated_at, and would then honor max_age against it.
+		DoNotRemember bool
 	}
 	Hydra interface {
 		AcceptLoginRequest(ctx context.Context, params AcceptLoginRequestParams) (string, error)
@@ -90,7 +92,7 @@ func (h *DefaultHydra) getAdminAPIClient(ctx context.Context) (hydraclientgo.OAu
 }
 
 func (h *DefaultHydra) AcceptLoginRequest(ctx context.Context, params AcceptLoginRequestParams) (string, error) {
-	remember := h.d.Config().SessionPersistentCookie(ctx)
+	remember := h.d.Config().SessionPersistentCookie(ctx) && !params.DoNotRemember
 	rememberFor := int64(h.d.Config().SessionLifespan(ctx) / time.Second)
 
 	alr := hydraclientgo.NewAcceptOAuth2LoginRequest(params.IdentityID)

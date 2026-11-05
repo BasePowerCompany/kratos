@@ -613,6 +613,7 @@ func (h *Handler) createBrowserLoginFlow(w http.ResponseWriter, r *http.Request)
 					IdentityID:            sess.IdentityID.String(),
 					SessionID:             sess.ID.String(),
 					AuthenticationMethods: sess.AMR,
+					DoNotRemember:         !hydraLoginRequest.GetSkip(),
 				})
 			if hydraErr != nil {
 				h.d.SelfServiceErrorManager().Forward(ctx, w, r, hydraErr)

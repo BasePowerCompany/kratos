@@ -842,6 +842,7 @@ func TestFlowLifecycle(t *testing.T) {
 				_, res := testhelpers.MockMakeAuthenticatedRequestWithClient(t, reg, conf, routerPublic, req, testhelpers.NewNoRedirectClientWithCookies(t))
 				assert.Equal(t, http.StatusSeeOther, res.StatusCode)
 				assert.Equal(t, hydra.FakePostLoginURL, res.Header.Get("Location"))
+				assert.True(t, fakeHydra.LastAccept.DoNotRemember, "an unskipped login must not be remembered by Hydra")
 			})
 
 			t.Run("case=oauth2 flow with existing session refreshes when Hydra asks for prompt=login", func(t *testing.T) {
