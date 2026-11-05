@@ -832,6 +832,29 @@ func TestFlowLifecycle(t *testing.T) {
 				require.Contains(t, res.Request.URL.String(), loginTS.URL)
 			})
 
+			t.Run("case=oauth2 flow with existing session accepts the login when Hydra does not ask to reauthenticate", func(t *testing.T) {
+				fakeHydra.RequestURL = "https://www.ory.sh/oauth2/auth?client_id=app&response_type=code"
+				t.Cleanup(func() {
+					fakeHydra.RequestURL = "https://www.ory.sh"
+				})
+
+				req := testhelpers.NewTestHTTPRequest(t, "GET", ts.URL+login.RouteInitBrowserFlow+"?login_challenge="+hydra.FakeValidLoginChallenge, nil)
+				_, res := testhelpers.MockMakeAuthenticatedRequestWithClient(t, reg, conf, routerPublic, req, testhelpers.NewNoRedirectClientWithCookies(t))
+				assert.Equal(t, http.StatusSeeOther, res.StatusCode)
+				assert.Equal(t, hydra.FakePostLoginURL, res.Header.Get("Location"))
+			})
+
+			t.Run("case=oauth2 flow with existing session refreshes when Hydra asks for prompt=login", func(t *testing.T) {
+				fakeHydra.RequestURL = "https://www.ory.sh/oauth2/auth?client_id=app&response_type=code&prompt=login"
+				t.Cleanup(func() {
+					fakeHydra.RequestURL = "https://www.ory.sh"
+				})
+
+				res, body := initAuthenticatedFlow(t, url.Values{"login_challenge": {hydra.FakeValidLoginChallenge}}, false)
+				require.Contains(t, res.Request.URL.String(), loginTS.URL)
+				assert.True(t, gjson.GetBytes(body, "refresh").Bool(), "%s", body)
+			})
+
 			t.Run("case=oauth2 flow init adds oauth2_login_request field", func(t *testing.T) {
 				res, body := initSPAFlow(t, url.Values{"login_challenge": {hydra.FakeValidLoginChallenge}})
 				assert.NotContains(t, res.Request.URL.String(), loginTS.URL)

@@ -581,9 +581,13 @@ func (h *Handler) createBrowserLoginFlow(w http.ResponseWriter, r *http.Request)
 		}
 
 		if !hydraLoginRequest.GetSkip() {
-			q := r.URL.Query()
-			q.Set("refresh", "true")
-			r.URL.RawQuery = q.Encode()
+			// A missing or unreadable session leaves the refresh in place; NewLoginFlow drops it when there is no session.
+			sess, _ := h.d.SessionManager().FetchFromRequest(ctx, r)
+			if hydraRequiresReauthentication(hydraLoginRequest, sess, time.Now()) {
+				q := r.URL.Query()
+				q.Set("refresh", "true")
+				r.URL.RawQuery = q.Encode()
+			}
 		}
 
 		// on OAuth2 flows, we need to use the RequestURL
@@ -603,11 +607,6 @@ func (h *Handler) createBrowserLoginFlow(w http.ResponseWriter, r *http.Request)
 	a, sess, err := h.NewLoginFlow(w, r, flow.TypeBrowser)
 	if errors.Is(err, ErrAlreadyLoggedIn) {
 		if hydraLoginRequest != nil {
-			if !hydraLoginRequest.GetSkip() {
-				h.d.SelfServiceErrorManager().Forward(ctx, w, r, errors.WithStack(herodot.ErrForbidden.WithReason("ErrAlreadyLoggedIn indicated we can skip login, but Hydra asked us to refresh")))
-				return
-			}
-
 			rt, hydraErr := h.d.Hydra().AcceptLoginRequest(ctx,
 				hydra.AcceptLoginRequestParams{
 					LoginChallenge:        string(hydraLoginChallenge),
