@@ -165,6 +165,11 @@ func (s *Strategy) Register(_ http.ResponseWriter, r *http.Request, regFlow *reg
 		return s.handleRegistrationError(r, regFlow, p, errors.WithStack(
 			herodot.ErrInternalServerError.WithReasonf("Unable to create WebAuthn credential: %s", err)))
 	}
+	if anchors := s.d.Config().WebAuthnHardwareKeyTrustAnchors(ctx); anchors != nil {
+		if err := webauthnx.VerifyHardwareKeyAttestation(webAuthnResponse.Response.AttestationObject, anchors); err != nil {
+			return s.handleRegistrationError(r, regFlow, p, err)
+		}
+	}
 
 	credentialWebAuthn := identity.CredentialFromWebAuthn(credential, true)
 	credentialWebAuthn.DisplayName = p.RegisterDisplayName
@@ -208,7 +213,8 @@ func (s *Strategy) injectWebauthnRegistrationOptions(r *http.Request, f *registr
 
 	webauthID := x.NewUUID()
 	user := webauthnx.NewUser(webauthID[:], nil, s.d.Config().WebAuthnConfig(ctx))
-	option, sessionData, err := web.BeginRegistration(user)
+	option, sessionData, err := web.BeginRegistration(user,
+		webauthnx.HardwareKeyRegistrationOptions(s.d.Config().WebAuthnHardwareKeyTrustAnchors(ctx))...)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

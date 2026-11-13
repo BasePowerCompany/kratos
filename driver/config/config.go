@@ -8,6 +8,7 @@ import (
 	"cmp"
 	"context"
 	"crypto/sha512"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -185,6 +186,7 @@ const (
 	ViperKeyWebAuthnRPOrigin                                 = "selfservice.methods.webauthn.config.rp.origin"
 	ViperKeyWebAuthnRPOrigins                                = "selfservice.methods.webauthn.config.rp.origins"
 	ViperKeyWebAuthnPasswordless                             = "selfservice.methods.webauthn.config.passwordless"
+	ViperKeyWebAuthnHardwareKeyTrustAnchors                  = "selfservice.methods.webauthn.config.hardware_keys.attestation_trust_anchors"
 	ViperKeyPasskeyEnabled                                   = "selfservice.methods.passkey.enabled"
 	ViperKeyPasskeyRPDisplayName                             = "selfservice.methods.passkey.config.rp.display_name"
 	ViperKeyPasskeyRPID                                      = "selfservice.methods.passkey.config.rp.id"
@@ -1490,12 +1492,26 @@ func (p *Config) WebAuthnForPasswordless(ctx context.Context) bool {
 	return p.GetProvider(ctx).BoolF(ViperKeyWebAuthnPasswordless, false)
 }
 
+// WebAuthnHardwareKeyTrustAnchors returns the CAs a new WebAuthn credential's
+// attestation has to chain to, or nil when any authenticator may be added.
+// Anchors that do not parse yield an empty pool, which refuses every new
+// credential rather than accepting all of them.
+func (p *Config) WebAuthnHardwareKeyTrustAnchors(ctx context.Context) *x509.CertPool {
+	anchors := p.GetProvider(ctx).String(ViperKeyWebAuthnHardwareKeyTrustAnchors)
+	if anchors == "" {
+		return nil
+	}
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM([]byte(anchors))
+	return pool
+}
+
 func (p *Config) WebAuthnConfig(ctx context.Context) *webauthn.Config {
 	scheme := p.SelfPublicURL(ctx).Scheme
 	id := p.GetProvider(ctx).String(ViperKeyWebAuthnRPID)
 	origin := p.GetProvider(ctx).String(ViperKeyWebAuthnRPOrigin)
 	origins := p.GetProvider(ctx).StringsF(ViperKeyWebAuthnRPOrigins, []string{cmp.Or(origin, scheme+"://"+id)})
-	return &webauthn.Config{
+	c := &webauthn.Config{
 		RPDisplayName: p.GetProvider(ctx).String(ViperKeyWebAuthnRPDisplayName),
 		RPID:          id,
 		RPOrigins:     origins,
@@ -1504,6 +1520,14 @@ func (p *Config) WebAuthnConfig(ctx context.Context) *webauthn.Config {
 		},
 		EncodeUserIDAsString: false,
 	}
+	if p.WebAuthnHardwareKeyTrustAnchors(ctx) != nil {
+		// Without direct attestation the browser strips the certificate
+		// chain that proves who made the key. cross-platform keeps the
+		// device's own passkey store out of the browser's picker.
+		c.AttestationPreference = protocol.PreferDirectAttestation
+		c.AuthenticatorSelection.AuthenticatorAttachment = protocol.CrossPlatform
+	}
+	return c
 }
 
 func (p *Config) PasskeyConfig(ctx context.Context) *webauthn.Config {

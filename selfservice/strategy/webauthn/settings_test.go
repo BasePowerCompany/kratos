@@ -53,6 +53,9 @@ var settingsFixtureSuccessResponse []byte
 //go:embed fixtures/settings/success/internal_context.json
 var settingsFixtureSuccessInternalContext []byte
 
+//go:embed fixtures/settings/yubico-u2f-root.pem
+var settingsFixtureYubicoRoot string
+
 const registerDisplayNameGJSONQuery = "ui.nodes.#(attributes.name==" + node.WebAuthnRegisterDisplayName + ")"
 
 func createIdentityWithoutWebAuthn(t *testing.T, reg driver.Registry) *identity.Identity {
@@ -357,6 +360,56 @@ func TestCompleteSettings(t *testing.T) {
 			assert.NotEqual(t, settingsFixtureSuccessInternalContext, gjson.GetBytes(actualFlow.InternalContext, flow.PrefixInternalContextKey(identity.CredentialsTypeWebAuthn, webauthn.InternalContextKeySessionData)))
 
 			testhelpers.EnsureAAL(t, browserClient, publicTS, "aal2", string(identity.CredentialsTypeWebAuthn))
+		}
+
+		t.Run("type=browser", func(t *testing.T) {
+			run(t, false)
+		})
+
+		t.Run("type=spa", func(t *testing.T) {
+			run(t, true)
+		})
+	})
+
+	t.Run("case=a key without attestation to a trusted anchor cannot be added", func(t *testing.T) {
+		conf.MustSet(t.Context(), config.ViperKeyWebAuthnHardwareKeyTrustAnchors, settingsFixtureYubicoRoot)
+		t.Cleanup(func() { conf.MustSet(context.Background(), config.ViperKeyWebAuthnHardwareKeyTrustAnchors, nil) })
+
+		run := func(t *testing.T, spa bool) {
+			var id identity.Identity
+			require.NoError(t, json.Unmarshal(settingsFixtureSuccessIdentity, &id))
+			id.NID = uuid.Must(uuid.NewV4())
+			_ = reg.PrivilegedIdentityPool().DeleteIdentity(t.Context(), id.ID)
+			browserClient := testhelpers.NewHTTPClientWithIdentitySessionCookie(t.Context(), t, reg, &id)
+			f := testhelpers.InitializeSettingsFlowViaBrowser(t, browserClient, spa, publicTS)
+
+			nodes, err := json.Marshal(f.Ui.Nodes)
+			require.NoError(t, err)
+			options := gjson.GetBytes(nodes, "#(attributes.name=="+node.WebAuthnRegisterTrigger+").attributes.value").String()
+			assert.Equal(t, "direct", gjson.Get(options, "publicKey.attestation").String(), options)
+			assert.Equal(t, "cross-platform", gjson.Get(options, "publicKey.authenticatorSelection.authenticatorAttachment").String(), options)
+			assert.Equal(t, `["security-key"]`, gjson.Get(options, "publicKey.hints").Raw, options)
+
+			interim, err := reg.SettingsFlowPersister().GetSettingsFlow(context.Background(), uuid.FromStringOrNil(f.Id))
+			require.NoError(t, err)
+			interim.InternalContext = settingsFixtureSuccessInternalContext
+			require.NoError(t, reg.SettingsFlowPersister().UpdateSettingsFlow(context.Background(), interim))
+
+			// The replayed key sent no attestation ("fmt": "none"), as a synced
+			// passkey does.
+			values := testhelpers.SDKFormFieldsToURLValues(f.Ui.Nodes)
+			values.Set(node.WebAuthnRegister, string(settingsFixtureSuccessResponse))
+			values.Set(node.WebAuthnRegisterDisplayName, "foobar")
+			body, _ := testhelpers.SettingsMakeRequest(t, false, spa, f, browserClient, testhelpers.EncodeFormAsJSON(t, spa, values))
+
+			assert.NotEqual(t, flow.StateSuccess, gjson.Get(body, "state").String(), body)
+			assert.Contains(t, body, "Only approved physical keys are accepted.")
+			actual, err := reg.Persister().GetIdentityConfidential(context.Background(), id.ID)
+			require.NoError(t, err)
+			cred, ok := actual.GetCredentials(identity.CredentialsTypeWebAuthn)
+			if ok {
+				assert.Empty(t, gjson.GetBytes(cred.Config, "credentials").Array())
+			}
 		}
 
 		t.Run("type=browser", func(t *testing.T) {

@@ -1810,6 +1810,20 @@
                       "title": "Use For Passwordless Flows",
                       "description": "If enabled will have the effect that WebAuthn is used for passwordless flows (as a first factor) and not for multi-factor set ups. With this set to true, users will see an option to sign up with WebAuthn on the registration screen."
                     },
+                    "hardware_keys": {
+                      "type": "object",
+                      "title": "Hardware Keys Only",
+                      "additionalProperties": false,
+                      "required": ["attestation_trust_anchors"],
+                      "properties": {
+                        "attestation_trust_anchors": {
+                          "type": "string",
+                          "minLength": 1,
+                          "title": "Attestation Trust Anchors",
+                          "description": "PEM-encoded CA certificates. When set, a new WebAuthn credential is accepted only when its authenticator proves, with a direct attestation certificate chaining to one of these, that it was made by that CA's manufacturer. Registration asks the browser for direct attestation and a cross-platform security key. Credentials added before this was set are unaffected."
+                        }
+                      }
+                    },
                     "rp": {
                       "title": "Relying Party (RP) Config",
                       "properties": {

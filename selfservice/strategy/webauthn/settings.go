@@ -266,6 +266,11 @@ func (s *Strategy) continueSettingsFlowAdd(ctx context.Context, ctxUpdate *setti
 	if err != nil {
 		return errors.WithStack(herodot.ErrInternalServerError.WithReasonf("Unable to create WebAuthn credential: %s", err))
 	}
+	if anchors := s.d.Config().WebAuthnHardwareKeyTrustAnchors(ctx); anchors != nil {
+		if err := webauthnx.VerifyHardwareKeyAttestation(webAuthnResponse.Response.AttestationObject, anchors); err != nil {
+			return err
+		}
+	}
 
 	i, err := s.d.PrivilegedIdentityPool().GetIdentityConfidential(ctx, ctxUpdate.Session.IdentityID)
 	if err != nil {
@@ -372,7 +377,8 @@ func (s *Strategy) PopulateSettingsMethod(ctx context.Context, r *http.Request, 
 		return errors.WithStack(err)
 	}
 
-	option, sessionData, err := web.BeginRegistration(webauthnx.NewUser(id.ID.Bytes(), nil, web.Config))
+	option, sessionData, err := web.BeginRegistration(webauthnx.NewUser(id.ID.Bytes(), nil, web.Config),
+		webauthnx.HardwareKeyRegistrationOptions(s.d.Config().WebAuthnHardwareKeyTrustAnchors(ctx))...)
 	if err != nil {
 		return errors.WithStack(err)
 	}
