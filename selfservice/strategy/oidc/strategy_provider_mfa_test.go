@@ -20,8 +20,9 @@ func TestProviderAssertedMFA(t *testing.T) {
 		want   bool
 	}{
 		{"trusts mfa from a trusted provider", trusted, withAMR([]any{"pwd", "mfa"}), true},
+		{"trusts Okta's phishing-resistant phr", trusted, withAMR([]any{"phr", "okta_verify"}), true},
 		{"ignores mfa from an untrusted provider", &Configuration{}, withAMR([]any{"pwd", "mfa"}), false},
-		{"needs mfa itself, not another method", trusted, withAMR([]any{"pwd", "otp"}), false},
+		{"needs mfa or phr, not another method", trusted, withAMR([]any{"pwd", "otp"}), false},
 		{"ignores a missing amr", trusted, &Claims{RawClaims: map[string]any{}}, false},
 		{"ignores an amr that is not an array", trusted, withAMR("mfa"), false},
 		{"ignores no claims", trusted, nil, false},

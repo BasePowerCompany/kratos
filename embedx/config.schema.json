@@ -614,7 +614,7 @@
         },
         "trust_amr_mfa": {
           "title": "Trust the provider's MFA",
-          "description": "When the ID token's `amr` claim contains `mfa`, the login satisfies a `highest_available` AAL requirement on login and whoami without the identity's own second factor. The session stays aal1, so flows requesting aal2 still ask for it.",
+          "description": "When the ID token's `amr` claim contains `mfa` or `phr`, the login satisfies a `highest_available` AAL requirement on login and whoami without the identity's own second factor. The session stays aal1, so flows requesting aal2 still ask for it.",
           "type": "boolean",
           "default": false
         }
