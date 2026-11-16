@@ -162,6 +162,10 @@ type Configuration struct {
 	// for: with "automatic" linking, a login asserting a verified address at one
 	// of them signs in to the identity that already verified that address.
 	AccountLinkingDomains []string `json:"account_linking_domains,omitempty"`
+
+	// TrustAMRMFA accepts this provider's `mfa` amr assertion in place of the
+	// identity's own second factor wherever `highest_available` allows it.
+	TrustAMRMFA bool `json:"trust_amr_mfa,omitempty"`
 }
 
 func (p Configuration) Redir(public *url.URL) string {

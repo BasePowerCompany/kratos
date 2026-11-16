@@ -243,7 +243,13 @@ func (s *Strategy) ProcessLogin(ctx context.Context, w http.ResponseWriter, r *h
 	}
 
 	sess := session.NewInactiveSession()
-	sess.CompletedLoginForWithProvider(s.ID(), identity.AuthenticatorAssuranceLevel1, provider.Config().ID, provider.Config().OrganizationID)
+	sess.CompletedLoginForMethod(session.AuthenticationMethod{
+		Method:       s.ID(),
+		AAL:          identity.AuthenticatorAssuranceLevel1,
+		Provider:     provider.Config().ID,
+		Organization: provider.Config().OrganizationID,
+		ProviderMFA:  providerAssertedMFA(provider.Config(), claims),
+	})
 
 	for _, c := range oidcCredentials.Providers {
 		if c.Subject == claims.Subject && c.Provider == provider.Config().ID {

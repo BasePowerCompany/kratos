@@ -76,8 +76,9 @@ func NewManagerHTTP(r managerHTTPDependencies) *ManagerHTTP {
 }
 
 type options struct {
-	requestURL string
-	upsertAAL  bool
+	requestURL        string
+	upsertAAL         bool
+	acceptProviderMFA bool
 }
 
 type ManagerOptions func(*options)
@@ -93,6 +94,14 @@ func WithRequestURL(requestURL string) ManagerOptions {
 // identities from older versions of Ory Kratos.
 func UpsertAAL(opts *options) {
 	opts.upsertAAL = true
+}
+
+// AcceptProviderMFA lets an aal1 session satisfy `highest_available` when an
+// OIDC provider trusted with `trust_amr_mfa` asserted MFA for its login. Only
+// login and whoami pass it: settings must not, or a session without the
+// identity's own second factor could enroll a new one.
+func AcceptProviderMFA(opts *options) {
+	opts.acceptProviderMFA = true
 }
 
 func (s *ManagerHTTP) UpsertAndIssueCookie(ctx context.Context, w http.ResponseWriter, r *http.Request, ss *Session) (err error) {
@@ -338,6 +347,10 @@ func (s *ManagerHTTP) DoesSessionSatisfy(ctx context.Context, sess *Session, req
 	case config.HighestAvailableAAL:
 		if sess.AuthenticatorAssuranceLevel == identity.AuthenticatorAssuranceLevel2 {
 			// The session has AAL2, nothing to check.
+			return nil
+		}
+
+		if managerOpts.acceptProviderMFA && sess.AMR.ProviderMFA() {
 			return nil
 		}
 

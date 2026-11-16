@@ -181,6 +181,17 @@ func (s *Session) CompletedLoginForWithProvider(method identity.CredentialsType,
 	})
 }
 
+// ProviderMFA reports whether any of these methods carries an OIDC provider's
+// MFA assertion.
+func (m AuthenticationMethods) ProviderMFA() bool {
+	for _, method := range m {
+		if method.ProviderMFA {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Session) AuthenticatedVia(method identity.CredentialsType) bool {
 	for _, authMethod := range s.AMR {
 		if authMethod.Method == method {
@@ -326,6 +337,10 @@ type AuthenticationMethod struct {
 
 	// The Organization id used for authentication
 	Organization string `json:"organization,omitempty"`
+
+	// ProviderMFA is set when an OIDC provider trusted with `trust_amr_mfa`
+	// asserted `mfa` in its ID token's `amr` claim for this login.
+	ProviderMFA bool `json:"provider_mfa,omitempty"`
 }
 
 // Scan implements the Scanner interface.

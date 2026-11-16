@@ -968,6 +968,28 @@ func TestDoesSessionSatisfy(t *testing.T) {
 				require.Equal(t, tcError.(*session.ErrAALNotSatisfied).RedirectTo, err.(*session.ErrAALNotSatisfied).RedirectTo)
 			},
 		},
+		{
+			desc:                  "has=aal1, requested=highest, available=aal2, provider asserted mfa, accepted",
+			matcher:               config.HighestAvailableAAL,
+			creds:                 []identity.Credentials{oidc(), mfaWebAuth()},
+			withAMR:               session.AuthenticationMethods{{Method: identity.CredentialsTypeOIDC, AAL: identity.AuthenticatorAssuranceLevel1, ProviderMFA: true}},
+			sessionManagerOptions: []session.ManagerOptions{session.AcceptProviderMFA},
+		},
+		{
+			desc:    "has=aal1, requested=highest, available=aal2, provider asserted mfa, not accepted",
+			matcher: config.HighestAvailableAAL,
+			creds:   []identity.Credentials{oidc(), mfaWebAuth()},
+			withAMR: session.AuthenticationMethods{{Method: identity.CredentialsTypeOIDC, AAL: identity.AuthenticatorAssuranceLevel1, ProviderMFA: true}},
+			errAs:   session.NewErrAALNotSatisfied(""),
+		},
+		{
+			desc:                  "has=aal1, requested=highest, available=aal2, provider did not assert mfa, accepted",
+			matcher:               config.HighestAvailableAAL,
+			creds:                 []identity.Credentials{oidc(), mfaWebAuth()},
+			withAMR:               session.AuthenticationMethods{{Method: identity.CredentialsTypeOIDC, AAL: identity.AuthenticatorAssuranceLevel1}},
+			errAs:                 session.NewErrAALNotSatisfied(""),
+			sessionManagerOptions: []session.ManagerOptions{session.AcceptProviderMFA},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			t.Parallel()
@@ -986,7 +1008,7 @@ func TestDoesSessionSatisfy(t *testing.T) {
 			req := testhelpers.NewTestHTTPRequest(t, "GET", "/sessions/whoami", nil)
 			s := session.NewInactiveSession()
 			for _, m := range tc.withAMR {
-				s.CompletedLoginFor(m.Method, m.AAL)
+				s.CompletedLoginForMethod(m)
 			}
 			require.NoError(t, reg.SessionManager().ActivateSession(req, s, id, time.Now().UTC()))
 
